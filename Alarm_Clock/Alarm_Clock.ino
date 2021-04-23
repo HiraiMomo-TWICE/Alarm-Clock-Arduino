@@ -33,7 +33,8 @@ float buttonTimer;
 // Button
 int state;
 float timer;
-bool isPressedButton
+bool isPressedButton;
+String curHour, curMinute, currentDay, curMonth, curYear;
 
 void tick()
 {
@@ -110,6 +111,71 @@ void loop() {
   deltaTime = (current - oldTime) / 1000;
   
   timeClient.update();
+
+  // Get current time data from NTPClient
+   int currentHour = timeClient.getHours();
+   if (currentHour < 10) {
+    curHour = "0" + String(currentHour);
+   } else {
+    curHour = String(currentHour);
+   }
+   
+   int currentMinute = timeClient.getMinute();
+   if (currentMinute < 10) {
+    curMinute = "0" + String(currentMinute);
+   } else {
+    curMinute = String(currentMinute);
+   }
+   
+   String weekDay = weekDays[timeClient.getDay()];
+   
+   int monthDay = ptm->tm_mday;
+   if (monthDay < 10) {
+    currentDay = "0" + String(monthDay);
+   } else {
+    currentDay = String(monthDay);
+   }
+   
+   int currentMonth = ptm->tm_mon+1;
+   if (currentMonth < 10) {
+    curMonth = "0" + String(currentMonth);
+   } else {
+    curMonth = String(currentMonth);
+   } 
+   
+   int currentYear = ptm->tm_year+1900;
+   curYear = String(currentYear);
+   
+   if (buttonState == HIGH && !isPressedButton) {
+    isPressedButton = true;
+    lcd.clear();
+    
+    switch (state) {
+      case 1:
+        state = 2;
+        break;
+      case 2:
+        state = 1;
+        break;
+   } else if (buttonState == LOW) {
+    switch (state) {
+      case 1:
+        // Set Date
+        lcd.setCursor(1, 0);
+        lcd.print("%s %s/%s/%s", weekDay, currentDay, curMonth, curYear);
+         
+        // Set humidity, set temperature, set Time
+        lcd.setCursor(1, 1);
+        lcd.print("");
+        break;
+      case 2:
+        // Show Alarm Time
+        lcd.setCursor(3, 0);
+        lcd.print("Alarm Time");
+        lcd.setCursor(
+        break;
+    }
+   }  
 
   if (isPressedButton) {
      timer += deltaTime;
