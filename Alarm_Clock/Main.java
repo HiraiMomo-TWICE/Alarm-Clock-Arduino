@@ -12,29 +12,6 @@ import java.io.*;
 import java.util.*;
 
 public class Main {
-//    public static List<Boolean> kidsWithCandies(int[] candies, int extraCandies) {
-//        int largestCandies = candies[0];
-//        List<Boolean> res = new ArrayList<>();
-//        for(int i = 1; i < candies.length; i++) {
-//            largestCandies = Math.max(largestCandies, candies[i]);
-//        }
-//        for(int i = 0; i < candies.length; i++) {
-//            res.add(candies[i] + extraCandies >= largestCandies);
-//        }
-//        return res;
-//    }
-//    public static int maximumWealth(int[][] accounts) {
-//        int max = 0;
-//        int sum = 0;
-//        for(int i = 0; i < accounts[0].length; i++) {
-//            max += accounts[0][i];
-//        }
-//        for(int i = 1; i < accounts.length; i++) {
-//            for(int j = 0; j < accounts[i].length; j++) {m
-//            sum = 0;
-//        }
-//        return max;
-//    }
     public static void main(String[] args) {
 	    JSONParser parser = new JSONParser();
         HashMap<String, ArrayList<String>> map = new HashMap<>();
