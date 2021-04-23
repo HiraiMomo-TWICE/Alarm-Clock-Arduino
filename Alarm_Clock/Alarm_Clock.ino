@@ -1,18 +1,39 @@
-#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
-#include <LiquidCrystal_I2C.h>
-#include <Wire.h>
-
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-
 //for LED status
 #include <Ticker.h>
 Ticker ticker;
+
+// Other libraries
+#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include <ESP8266WiFi.h>
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
+
+// Read PIN of sensor, buttons
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 #ifndef LED_BUILTIN
 #define LED_BUILTIN 13 // ESP32 DOES NOT DEFINE LED_BUILTIN
 #endif
 
 int LED = LED_BUILTIN;
+String weekDays[7] = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+String months[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+// Delta Time
+float current;
+float oldTime;
+float deltaTime;
+float buttonTimer;
+
+// Button
+int state;
+float timer;
+bool isPressedButton
 
 void tick()
 {
@@ -69,20 +90,33 @@ void setup() {
   digitalWrite(LED, LOW);
 
   Wire.begin(D2, D1);
+
+  state = 1;
+  buttonTimer = .5;
+  isPressedButton = false;
+  
+  timeClient.begin();
+  timeClient.setTimeOffset(25200);
+  
   lcd.init();
   lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.write(0);
-  lcd.setCursor(2, 0);
-  lcd.print("Welcome to");
-  lcd.setCursor(1, 0);
-  lcd.print("Alarm Clock");
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  lcd.display();
-  delay(1000);
-  lcd.noDisplay();
-  delay(1000);
+  // Update deltatime
+  oldTime = current;
+  current = millis();
+  deltaTime = (current - oldTime) / 1000;
+  
+  timeClient.update();
+
+  if (isPressedButton) {
+     timer += deltaTime;
+     
+     if (timer >= buttonTimer) {
+        timer = 0;
+        isPressedButton = false;
+     }
+  }
 }
