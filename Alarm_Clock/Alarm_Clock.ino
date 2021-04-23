@@ -1,4 +1,8 @@
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 //for LED status
 #include <Ticker.h>
@@ -27,10 +31,11 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 }
 
 void setup() {
+  WiFi.disconnect(true);
   // put your setup code here, to run once:
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  Serial.begin(9600);
   
   //set led pin as output
   pinMode(LED, OUTPUT);
@@ -62,9 +67,22 @@ void setup() {
   ticker.detach();
   //keep LED on
   digitalWrite(LED, LOW);
+
+  Wire.begin(D2, D1);
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.write(0);
+  lcd.setCursor(2, 0);
+  lcd.print("Welcome to");
+  lcd.setCursor(1, 0);
+  lcd.print("Alarm Clock");
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+  lcd.display();
+  delay(1000);
+  lcd.noDisplay();
+  delay(1000);
 }
