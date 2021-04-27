@@ -1,0 +1,8 @@
+{
+  "Australia": [ "Yunta", "Yundi", "Yuna" ],
+  "Vietnam": [ "Ho Chi Minh City", "Ha Noi", "Da Nang", "Binh Duong", "Thai Binh", "Ha Tinh" ],
+  "China": [ "Zongzhai", "Zongga", "Zito", "Beijing", "Shanghai" ],
+  "Japan": [ "Tokyo", "Osaka", "Kobe" ],
+  "Korea": [ "Seoul", "Seongnam", "Suwon", "Guri" ],
+  "Taiwan":  [ "Yunlin", "Tainan" ]
+}

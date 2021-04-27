@@ -15,11 +15,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 int STATE_BUTTON = 14;
 int DHT_PIN = 12;
-//int BUZZER_PIN = 10;
+int BUZZER_PIN = 10;
 //int BUTTON_ALARM = 12;
-
-const char *ssid = "42/1 2";
-const char *password = "caovanson42";
 
 String curHour, curMinute, currentDay, curMonth, curYear;
 String hourAlarmString, minuteAlarmString;
@@ -86,11 +83,16 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 }
 
 void setup() {
-  WiFi.disconnect(true);
+  // Setup pin for required input and output
+  dht.begin();
+  pinMode(STATE_BUTTON, INPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+  //pinMode(BUTTON_ALARM, OUTPUT);
+  noTone(BUZZER_PIN);
   // put your setup code here, to run once:
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   // put your setup code here, to run once:
-  Serial.begin(9600);
+  Serial.begin(115200);
   
   //set led pin as output
   pinMode(LED, OUTPUT);
@@ -138,12 +140,6 @@ void setup() {
   
   timeClient.begin();
   timeClient.setTimeOffset(25200);
-
-  // Setup pin for required input and output
-  dht.begin();
-  pinMode(STATE_BUTTON, INPUT);
-  //pinMode(BUZZER_PIN, OUTPUT);
-  //pinMode(BUTTON_ALARM, OUTPUT);
 
   // Setup for LCD_I2C
   Wire.begin(D2, D1);
@@ -309,4 +305,24 @@ void loop() {
          isPressedButton = false;
       }
    }
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+
+  // Switch on the LED if an 1 was received as first character
+  if ((char)payload[0] == '1') {
+    digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
+    // but actually the LED is on; this is because
+    // it is active low on the ESP-01)
+  } else {
+    digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
+  }
+
 }
