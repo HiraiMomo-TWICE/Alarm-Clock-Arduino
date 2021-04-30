@@ -10,12 +10,13 @@ Ticker ticker;
 #include <WiFiUdp.h>
 #include <ESP8266WiFi.h>
 #include <DHT.h>
+#include <PubSubClient.h>
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 int STATE_BUTTON = 14;
 int DHT_PIN = 12;
-int BUZZER_PIN = 10;
+// int BUZZER_PIN = 10;
 //int BUTTON_ALARM = 12;
 
 String curHour, curMinute, currentDay, curMonth, curYear;
@@ -54,6 +55,16 @@ int LED = LED_BUILTIN;
 // DHT11 Sensor
 DHT dht(DHT_PIN, DHT11);
 
+WiFiClient espClient;
+PubSubClient client(espClient);
+unsigned long lastMsg = 0;
+#define MSG_BUFFER_SIZE  (50)
+char msg[MSG_BUFFER_SIZE];
+
+String ssid = "........";
+String password = "........";
+const char* mqtt_server = "broker.mqtt-dashboard.com";
+
 // Icon
 byte degreeIcon[] = {
   B11100,
@@ -83,52 +94,22 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 }
 
 void setup() {
+  // Setup for LCD_I2C
+  Wire.begin(D2, D1);
+  lcd.init();
+  lcd.backlight();
+  lcd.createChar(0, degreeIcon);
+  
   // Setup pin for required input and output
   dht.begin();
   pinMode(STATE_BUTTON, INPUT);
-  pinMode(BUZZER_PIN, OUTPUT);
+  //pinMode(BUZZER_PIN, OUTPUT);
   //pinMode(BUTTON_ALARM, OUTPUT);
-  noTone(BUZZER_PIN);
-  // put your setup code here, to run once:
-  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
-  // put your setup code here, to run once:
-  Serial.begin(115200);
-  
-  //set led pin as output
-  pinMode(LED, OUTPUT);
-  // start ticker with 0.5 because we start in AP mode and try to connect
-  ticker.attach(0.6, tick);
+  //noTone(BUZZER_PIN);
+  setup_wifi();
 
-  //WiFiManager
-  //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wm;
-  //reset settings - for testing
-  // wm.resetSettings();
-
-  //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
-  wm.setAPCallback(configModeCallback);
-
-  //fetches ssid and pass and tries to connect
-  //if it does not connect it starts an access point with the specified name
-  //here  "AutoConnectAP"
-  //and goes into a blocking loop awaiting configuration
-  if (!wm.autoConnect()) {
-    Serial.println("failed to connect and hit timeout");
-    //reset and try again, or maybe put it to deep sleep
-    ESP.restart();
-    delay(1000);
-  }
-
-  //if you get here you have connected to the WiFi
-  Serial.println("connected...yeey :)");
-  ticker.detach();
-  //keep LED on
-  digitalWrite(LED, LOW);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
 
   // Initialize variables
   state = 1;
@@ -140,15 +121,15 @@ void setup() {
   
   timeClient.begin();
   timeClient.setTimeOffset(25200);
-
-  // Setup for LCD_I2C
-  Wire.begin(D2, D1);
-  lcd.init();
-  lcd.backlight();
-  lcd.createChar(0, degreeIcon);
 }
 
 void loop() {
+
+   if (!client.connected()) {
+      reconnect();
+   }
+   client.loop();
+  
    oldTime = current;
    current = millis();
    deltaTime = (current - oldTime) / 1000;
@@ -170,7 +151,6 @@ void loop() {
    }
    
    int buttonState = digitalRead(STATE_BUTTON);
-   Serial.println(buttonState);
 
    // Read Humidity and Temperature
    float humidity = dht.readHumidity();
@@ -180,6 +160,15 @@ void loop() {
    // Convert to String
    String h = String(int_humidity);
    String t = String(int_temperature);
+
+   unsigned long now = millis();
+   if (now - lastMsg > 1000) {
+     lastMsg = now;
+     snprintf (msg, MSG_BUFFER_SIZE, "%ld", int_humidity);
+     client.publish("room/humidity", msg);
+     snprintf (msg, MSG_BUFFER_SIZE, "%ld", int_temperature);
+     client.publish("room/temperature", msg);
+   }
    
    //int alarmButton = digitalRead(BUTTON_ALARM);
   
@@ -187,7 +176,7 @@ void loop() {
   
    struct tm *ptm = gmtime ((time_t *)&epochTime);
 
-  // Get current time data from NTPClient
+   // Get current time data from NTPClient
    int currentHour = timeClient.getHours();
    if (currentHour < 10) {
       curHour = "0" + String(currentHour);
@@ -325,4 +314,75 @@ void callback(char* topic, byte* payload, unsigned int length) {
     digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
   }
 
+}
+
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.println("Attempting MQTT connection...");
+    // Create a random client ID
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    // Attempt to connect
+    if (client.connect(clientId.c_str())) {
+      Serial.println("connected");
+      // Once connected, publish an announcement...
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+void setup_wifi() {
+  WiFi.disconnect(true);
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting...");
+  // put your setup code here, to run once:
+  WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  // put your setup code here, to run once:
+  Serial.begin(115200); 
+  //set led pin as output
+  pinMode(LED, OUTPUT);
+  // start ticker with 0.5 because we start in AP mode and try to connect
+  ticker.attach(0.6, tick);
+
+  //WiFiManager
+  //Local intialization. Once its business is done, there is no need to keep it around
+  WiFiManager wm;
+  //reset settings - for testing
+  // wm.resetSettings();
+
+  //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
+  wm.setAPCallback(configModeCallback);
+
+  //fetches ssid and pass and tries to connect
+  //if it does not connect it starts an access point with the specified name
+  //here  "AutoConnectAP"
+  //and goes into a blocking loop awaiting configuration
+  if (!wm.autoConnect()) {
+    Serial.println("failed to connect and hit timeout");
+    //reset and try again, or maybe put it to deep sleep
+    ESP.restart();
+    delay(1000);
+  }
+
+  //if you get here you have connected to the WiFi
+  lcd.clear();
+  Serial.println("connected...yeey :)");
+  lcd.print("Connected");
+  ticker.detach();
+  //keep LED on
+  digitalWrite(LED, LOW);
+
+  ssid = WiFi.SSID();
+  password = WiFi.psk();
+
+  Serial.print("Connected to: ");
+  Serial.println(ssid);
+  delay(2000);
+  lcd.clear();
 }
