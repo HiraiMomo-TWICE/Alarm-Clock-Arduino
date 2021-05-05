@@ -14,10 +14,10 @@ Ticker ticker;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-int STATE_BUTTON = 14;
-int DHT_PIN = 12;
-// int BUZZER_PIN = 10;
-//int BUTTON_ALARM = 12;
+int STATE_BUTTON = D5;
+int DHT_PIN = D6;
+//int BUZZER_PIN = 10;
+//int BUTTON_ALARM = 9;
 
 String curHour, curMinute, currentDay, curMonth, curYear;
 String hourAlarmString, minuteAlarmString;
@@ -118,6 +118,9 @@ void setup() {
   isAlarmActivated = true;
   isPressedButton = false;
   alarmState = 1;
+
+  hourAlarming = 7;
+  minuteAlarming = 0;
   
   timeClient.begin();
   timeClient.setTimeOffset(25200);
@@ -136,14 +139,12 @@ void loop() {
    // put your main code here, to run repeatedly:
    timeClient.update();
 
-   hourAlarming = 7;
    if (hourAlarming < 10) {
       hourAlarmString = "0" + String(hourAlarming);
    } else {
       hourAlarmString = String(hourAlarming);
    }
    
-   minuteAlarming = 0;
    if (hourAlarming < 10) {
       minuteAlarmString = "0" + String(minuteAlarming);
    } else {
@@ -168,6 +169,10 @@ void loop() {
      client.publish("room/humidity", msg);
      snprintf (msg, MSG_BUFFER_SIZE, "%ld", int_temperature);
      client.publish("room/temperature", msg);
+     snprintf (msg, MSG_BUFFER_SIZE, "%ld", hourAlarming);
+     client.publish("alarm/currentHour", msg);
+     snprintf (msg, MSG_BUFFER_SIZE, "%ld", minuteAlarming);
+     client.publish("alarm/currentMinute", msg);
    }
    
    //int alarmButton = digitalRead(BUTTON_ALARM);
@@ -220,6 +225,8 @@ void loop() {
    //   } else if (!isAlarmActivated || !isAlarming ) {
    //       noTone(BUZZER_PIN);
    //   }
+   //} else {
+   //   isAlarming = true;
    //}
 
    String alarmHourDisplay = String(hourAlarming);
@@ -236,42 +243,28 @@ void loop() {
          case 2:
            state = 1;
            break;
-      }
+     }
       
    } else if (buttonState == LOW) {
       switch (state) {
         case 1:
           // Set Date (First Line)
-          lcd.setCursor(1, 0);
-          lcd.print(weekDay);
-          lcd.setCursor(5, 0);
-          lcd.print(currentDay);
-          lcd.setCursor(7, 0);
-          lcd.print("/");
-          lcd.setCursor(8, 0);
-          lcd.print(curMonth);
-          lcd.setCursor(10, 0);
-          lcd.print("/");
-          lcd.setCursor(11, 0);
-          lcd.print(curYear);
+          lcd.setCursor(1, 0); lcd.print(weekDay);
+          lcd.setCursor(5, 0); lcd.print(currentDay);
+          lcd.setCursor(7, 0); lcd.print("/");
+          lcd.setCursor(8, 0); lcd.print(curMonth);
+          lcd.setCursor(10, 0); lcd.print("/");
+          lcd.setCursor(11, 0); lcd.print(curYear);
 
           // Set Time (Second Line)
-          lcd.setCursor(1, 1);
-          lcd.print(h);
-          lcd.setCursor(3, 1);
-          lcd.print("%");
-          lcd.setCursor(5, 1);
-          lcd.print(t);
-          lcd.setCursor(7, 1);
-          lcd.write(byte(0));
-          lcd.setCursor(8, 1);
-          lcd.print("C");
-          lcd.setCursor(10, 1);
-          lcd.print(curHour);
-          lcd.setCursor(12, 1);
-          lcd.print(":");
-          lcd.setCursor(13, 1);
-          lcd.print(curMinute);
+          lcd.setCursor(1, 1); lcd.print(h);
+          lcd.setCursor(3, 1); lcd.print("%");
+          lcd.setCursor(5, 1); lcd.print(t);
+          lcd.setCursor(7, 1); lcd.write(byte(0));
+          lcd.setCursor(8, 1); lcd.print("C");
+          lcd.setCursor(10, 1); lcd.print(curHour);
+          lcd.setCursor(12, 1); lcd.print(":");
+          lcd.setCursor(13, 1); lcd.print(curMinute);
           break;
           
         case 2:
@@ -300,10 +293,26 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
+  String messageTemp;
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
+    messageTemp += (char)payload[i];
   }
   Serial.println();
+
+  if (topic == "alarm/hour") {
+    hourAlarming = messageTemp.toInt();
+    Serial.println(hourAlarming);
+  } else if (topic == "alarm/minute") {
+    minuteAlarming = messageTemp.toInt();
+    Serial.println(minuteAlarming);
+  } else if (topic == "alarm/isActivated") {
+    if (messageTemp == "true") {
+       isAlarmActivated = true;  
+    } else {
+      isAlarmActivated = false;
+    }
+  }
 
   // Switch on the LED if an 1 was received as first character
   if ((char)payload[0] == '1') {
@@ -327,6 +336,10 @@ void reconnect() {
     if (client.connect(clientId.c_str())) {
       Serial.println("connected");
       // Once connected, publish an announcement...
+      lcd.clear();
+      client.subscribe("alarm/hour");
+      client.subscribe("alarm/minute");
+      client.subscribe("alarm/isActivated");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -338,7 +351,6 @@ void reconnect() {
 }
 
 void setup_wifi() {
-  WiFi.disconnect(true);
   lcd.setCursor(0, 0);
   lcd.print("Connecting...");
   // put your setup code here, to run once:
@@ -373,7 +385,6 @@ void setup_wifi() {
   //if you get here you have connected to the WiFi
   lcd.clear();
   Serial.println("connected...yeey :)");
-  lcd.print("Connected");
   ticker.detach();
   //keep LED on
   digitalWrite(LED, LOW);
@@ -383,6 +394,10 @@ void setup_wifi() {
 
   Serial.print("Connected to: ");
   Serial.println(ssid);
+  lcd.setCursor(0, 0);
+  lcd.print("Connected to:");
+  lcd.setCursor(1, 1);
+  lcd.print(ssid);
   delay(2000);
   lcd.clear();
 }
