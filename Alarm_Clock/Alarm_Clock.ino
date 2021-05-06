@@ -18,10 +18,10 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 int STATE_BUTTON = D5;
 int DHT_PIN = D6;
 //int BUZZER_PIN = 10;
-//int BUTTON_ALARM = 9;
+int BUTTON_ALARM = D7;
 
 String curHour, curMinute, currentDay, curMonth, curYear;
-String hourAlarmString, minuteAlarmString;
+String hourAlarmString, minuteAlarmString, alarmActivationString;
 
 String weekDays[7] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
 String months[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
@@ -69,14 +69,12 @@ const char* mqtt_server = "broker.mqtt-dashboard.com";
 int int_humidity, int_temperature;
 
 //---------Channel Details---------//
-unsigned long counterChannelNumber1 = 1382324;            // Channel ID
-const char * myCounterReadAPIKey1 = "V6XAK8OIWWYX5MQI"; // Read API Key
+unsigned long counterChannelNumber1 = 1381985;            // Channel ID
+const char * myCounterReadAPIKey1 = "5OICR66IHNWE1F2Q"; // Read API Key
 
-unsigned long counterChannelNumber2 = 1382328;            // Channel ID
-const char * myCounterReadAPIKey2 = "EWPDI2UEGV8FTLUL"; // Read API Key
-
-const int FieldNumber1 = 1;  // The field you wish to read
-const int FieldNumber2 = 2;
+const int FieldNumber3 = 3;  // The field you wish to read
+const int FieldNumber4 = 4;
+const int FieldNumber5 = 5;
 //-------------------------------//
 
 // Icon
@@ -117,8 +115,8 @@ void setup() {
   // Setup pin for required input and output
   dht.begin();
   pinMode(STATE_BUTTON, INPUT);
-  //pinMode(BUZZER_PIN, OUTPUT);
-  //pinMode(BUTTON_ALARM, OUTPUT);
+  pinMode(BUTTON_ALARM, INPUT);
+  //pinMode(BUZZER_PIN, OUTPUT); 
   //noTone(BUZZER_PIN);
   setup_wifi();
 
@@ -136,8 +134,9 @@ void setup() {
   int_temperature = 0;
 
   //---------------- Channel 1 ----------------//
-  hourAlarming = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber1, myCounterReadAPIKey1);
-  minuteAlarming = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber2, myCounterReadAPIKey1);
+  hourAlarming = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber3, myCounterReadAPIKey1);
+  minuteAlarming = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber4, myCounterReadAPIKey1);
+  isAlarmActivated = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber5, myCounterReadAPIKey1);
   int statusCode = ThingSpeak.getLastReadStatus();
   if (statusCode == 200)
   {
@@ -149,20 +148,6 @@ void setup() {
   }
   delay(100);
   //-------------- End of Channel 1 -------------//
-
-  //---------------- Channel 2 ----------------//
-  isAlarmActivated = ThingSpeak.readLongField(counterChannelNumber2, FieldNumber1, myCounterReadAPIKey2);
-  statusCode = ThingSpeak.getLastReadStatus();
-  if (statusCode == 200)
-  {
-    Serial.println("Successfully get data");
-  }
-  else
-  {
-    Serial.println("Unable to read channel / No internet connection");
-  }
-  delay(100);
-  //-------------- End of Channel 2 -------------//
   
   timeClient.begin();
   timeClient.setTimeOffset(25200);
@@ -193,6 +178,12 @@ void loop() {
    } else {
       minuteAlarmString = String(minuteAlarming);
    }
+
+   if (isAlarmActivated) {
+      alarmActivationString = "ON";
+   } else {
+      alarmActivationString = "OFF";
+   }
    
    int buttonState = digitalRead(STATE_BUTTON);
 
@@ -221,7 +212,7 @@ void loop() {
      client.publish("alarm/currentActivation", msg);
    }
    
-   //int alarmButton = digitalRead(BUTTON_ALARM);
+   int alarmButton = digitalRead(BUTTON_ALARM);
   
    unsigned long epochTime = timeClient.getEpochTime();
   
@@ -261,19 +252,21 @@ void loop() {
    int currentYear = ptm->tm_year+1900;
    curYear = String(currentYear);
 
-   //if (alarmButton == HIGH && isAlarming) {
-   //   isAlarming = false;
-   //}
-
-   //if (hourAlarming == currentHour && minuteAlarming == currentMinute) {
-   //   if (isAlarmActivated && isAlarming) {
-   //       tone(BUZZER_PIN, 350, 5);
-   //   } else if (!isAlarmActivated || !isAlarming ) {
-   //       noTone(BUZZER_PIN);
-   //   }
-   //} else {
-   //   isAlarming = true;
-   //}
+   if (hourAlarming == currentHour && minuteAlarming == currentMinute) {
+      if (alarmButton == HIGH && isAlarmActivated) {
+          isAlarmActivated = false;
+      } else {
+        if (!isAlarmActivated) {
+        //    noTone(BUZZER_PIN);
+              Serial.println("NO BUZZER");
+        } else if (isAlarmActivated) {
+        //    tone(BUZZER_PIN, 350, 5);
+              Serial.println("BUZZER");
+        } 
+      }
+   } else {
+      Serial.println("NO BUZZER");
+   }
 
    if (buttonState == HIGH && !isPressedButton) {
       isPressedButton = true;
@@ -315,12 +308,7 @@ void loop() {
           lcd.setCursor(3, 0); lcd.print("Alarm Time");
           lcd.setCursor(4, 1); lcd.print(hourAlarmString);
           lcd.print(":"); lcd.print(minuteAlarmString);
-          lcd.setCursor(10, 1);
-          if (isAlarmActivated) {
-            lcd.print("ON");
-          } else {
-            lcd.print("OFF");
-          }
+          lcd.setCursor(10, 1); lcd.print(alarmActivationString);
           break;
       }
    }  
