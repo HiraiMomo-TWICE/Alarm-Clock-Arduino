@@ -18,7 +18,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 int STATE_BUTTON = D5;
 int DHT_PIN = D6;
 //int BUZZER_PIN = 10;
-int BUTTON_ALARM = 9;
+int BUTTON_ALARM = D7;
 
 String curHour, curMinute, currentDay, curMonth, curYear;
 String hourAlarmString, minuteAlarmString;
@@ -261,23 +261,20 @@ void loop() {
    int currentYear = ptm->tm_year+1900;
    curYear = String(currentYear);
 
-   if (alarmButton == HIGH && isAlarming) {
-      isAlarming = false;
-   }
-
    if (hourAlarming == currentHour && minuteAlarming == currentMinute) {
-      if (isAlarmActivated) {
-   //       tone(BUZZER_PIN, 350, 5);
-            Serial.println("BUZZER");
-            isAlarming = true;
-      }
-      else if (!isAlarmActivated || !isAlarming ) {
-   //       noTone(BUZZER_PIN);
-            Serial.println("NO BUZZER");
+      if (alarmButton == HIGH && isAlarmActivated) {
+          isAlarmActivated = false;
+      } else {
+        if (!isAlarmActivated) {
+        //    noTone(BUZZER_PIN);
+              Serial.println("NO BUZZER");
+        } else if (isAlarmActivated) {
+        //    tone(BUZZER_PIN, 350, 5);
+              Serial.println("BUZZER");
+        } 
       }
    } else {
       Serial.println("NO BUZZER");
-      isAlarming = true;
    }
 
    if (buttonState == HIGH && !isPressedButton) {
