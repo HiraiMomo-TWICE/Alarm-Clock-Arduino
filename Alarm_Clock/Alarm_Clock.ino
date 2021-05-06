@@ -29,8 +29,8 @@ String months[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
-int hourAlarming;
-int minuteAlarming;
+long hourAlarming = 7;
+long minuteAlarming = 0;
 
 // Delta Time
 float current;
@@ -72,7 +72,7 @@ const char * myWriteAPIKey = "C5C73P2GB183FKMR";
 int int_humidity, int_temperature;
 
 unsigned long send_time = 0;
-unsigned long send_time_repeat = 15000;
+unsigned long send_time_repeat = 60000;
 
 // Icon
 byte degreeIcon[] = {
@@ -127,9 +127,7 @@ void setup() {
   isAlarmActivated = true;
   isPressedButton = false;
   alarmState = 1;
-
-  hourAlarming = 7;
-  minuteAlarming = 0;
+  
   int_humidity = 0;
   int_temperature = 0;
   
@@ -139,6 +137,7 @@ void setup() {
 
 void loop() {
 
+   timeClient.update();
    if (!client.connected()) {
       reconnect();
    }
@@ -148,7 +147,7 @@ void loop() {
    current = millis();
    deltaTime = (current - oldTime) / 1000;
    // put your main code here, to run repeatedly:
-   timeClient.update();
+   delay(1000);
 
    if (hourAlarming < 10) {
       hourAlarmString = "0" + String(hourAlarming);
@@ -156,7 +155,7 @@ void loop() {
       hourAlarmString = String(hourAlarming);
    }
    
-   if (hourAlarming < 10) {
+   if (minuteAlarming < 10) {
       minuteAlarmString = "0" + String(minuteAlarming);
    } else {
       minuteAlarmString = String(minuteAlarming);
@@ -256,9 +255,6 @@ void loop() {
    //   isAlarming = true;
    //}
 
-   String alarmHourDisplay = String(hourAlarming);
-   String alarmMinuteDisplay = String(minuteAlarming);
-
    if (buttonState == HIGH && !isPressedButton) {
       isPressedButton = true;
       lcd.clear();
@@ -329,22 +325,22 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   Serial.println(messageTemp);
 
-  if (topic == "alarm/hour") {
+  if (strcmp(topic, "alarm/hour") == 0) {
     int tempHourAlarm = messageTemp.toInt();
     hourAlarming = tempHourAlarm;
-    Serial.println(hourAlarming);
-  } else if (topic == "alarm/minute") {
+  }
+  if (strcmp(topic, "alarm/minute") == 0) {
     int tempMinuteAlarm = messageTemp.toInt();
     minuteAlarming = tempMinuteAlarm;
-    Serial.println(minuteAlarming);
-  } else if (topic == "alarm/isActivated") {
+  } 
+  if (strcmp(topic, "alarm/isActivated") == 0) {
     if (messageTemp == "true") {
        isAlarmActivated = true;  
     } else {
       isAlarmActivated = false;
     }
   }
-
+  
   // Switch on the LED if an 1 was received as first character
   if ((char)payload[0] == '1') {
     digitalWrite(BUILTIN_LED, LOW);   // Turn the LED on (Note that LOW is the voltage level
@@ -353,6 +349,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   } else {
     digitalWrite(BUILTIN_LED, HIGH);  // Turn the LED off by making the voltage HIGH
   }
+  Serial.println("Callback called");
 
 }
 
