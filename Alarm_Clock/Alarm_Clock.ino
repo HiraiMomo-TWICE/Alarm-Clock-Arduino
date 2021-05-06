@@ -11,6 +11,7 @@ Ticker ticker;
 #include <ESP8266WiFi.h>
 #include <DHT.h>
 #include <PubSubClient.h>
+#include <ThingSpeak.h>
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -64,6 +65,14 @@ char msg[MSG_BUFFER_SIZE];
 String ssid = "........";
 String password = "........";
 const char* mqtt_server = "broker.mqtt-dashboard.com";
+const char *cloudServer = "api.thingspeak.com";
+unsigned long myChannelNumber = 1381985;
+const char * myWriteAPIKey = "C5C73P2GB183FKMR";
+
+int int_humidity, int_temperature;
+
+unsigned long send_time = 0;
+unsigned long send_time_repeat = 15000;
 
 // Icon
 byte degreeIcon[] = {
@@ -121,6 +130,8 @@ void setup() {
 
   hourAlarming = 7;
   minuteAlarming = 0;
+  int_humidity = 0;
+  int_temperature = 0;
   
   timeClient.begin();
   timeClient.setTimeOffset(25200);
@@ -156,11 +167,27 @@ void loop() {
    // Read Humidity and Temperature
    float humidity = dht.readHumidity();
    float temperature = dht.readTemperature();
-   int int_humidity = (int) humidity;
-   int int_temperature = (int) temperature;
+   int_humidity = (int) humidity;
+   int_temperature = (int) temperature;
+   
    // Convert to String
    String h = String(int_humidity);
    String t = String(int_temperature);
+
+   String ThingSpeakData = t + "*C" + " / " + h + "%" + " / " + hourAlarmString + ":" + minuteAlarmString;
+
+   if (millis() - send_time >= send_time_repeat) {
+     Serial.println(ThingSpeakData);
+     ThingSpeak.setField(1, ThingSpeakData);
+     int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+     if(x == 200){
+       Serial.println("Channel update successful.");
+     }
+     else{
+       Serial.println("Problem updating channel. HTTP error code " + String(x));
+     }
+     send_time = millis();
+   }
 
    unsigned long now = millis();
    if (now - lastMsg > 1000) {
@@ -300,11 +327,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   Serial.println();
 
+  Serial.println(messageTemp);
+
   if (topic == "alarm/hour") {
-    hourAlarming = messageTemp.toInt();
+    int tempHourAlarm = messageTemp.toInt();
+    hourAlarming = tempHourAlarm;
     Serial.println(hourAlarming);
   } else if (topic == "alarm/minute") {
-    minuteAlarming = messageTemp.toInt();
+    int tempMinuteAlarm = messageTemp.toInt();
+    minuteAlarming = tempMinuteAlarm;
     Serial.println(minuteAlarming);
   } else if (topic == "alarm/isActivated") {
     if (messageTemp == "true") {
@@ -400,4 +431,5 @@ void setup_wifi() {
   lcd.print(ssid);
   delay(2000);
   lcd.clear();
+  ThingSpeak.begin(espClient);
 }
