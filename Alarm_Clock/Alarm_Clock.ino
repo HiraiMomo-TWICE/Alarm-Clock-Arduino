@@ -3,6 +3,7 @@
 Ticker ticker;
 
 // Other libraries
+#include <ThingSpeak.h>
 #include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
@@ -11,7 +12,6 @@ Ticker ticker;
 #include <ESP8266WiFi.h>
 #include <DHT.h>
 #include <PubSubClient.h>
-#include <ThingSpeak.h>
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
@@ -29,8 +29,8 @@ String months[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "S
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
-long hourAlarming = 7;
-long minuteAlarming = 0;
+long hourAlarming;
+long minuteAlarming;
 
 // Delta Time
 float current;
@@ -65,14 +65,19 @@ char msg[MSG_BUFFER_SIZE];
 String ssid = "........";
 String password = "........";
 const char* mqtt_server = "broker.mqtt-dashboard.com";
-const char *cloudServer = "api.thingspeak.com";
-unsigned long myChannelNumber = 1381985;
-const char * myWriteAPIKey = "C5C73P2GB183FKMR";
 
 int int_humidity, int_temperature;
 
-unsigned long send_time = 0;
-unsigned long send_time_repeat = 60000;
+//---------Channel Details---------//
+unsigned long counterChannelNumber1 = 1382324;            // Channel ID
+const char * myCounterReadAPIKey1 = "V6XAK8OIWWYX5MQI"; // Read API Key
+
+unsigned long counterChannelNumber2 = 1382328;            // Channel ID
+const char * myCounterReadAPIKey2 = "EWPDI2UEGV8FTLUL"; // Read API Key
+
+const int FieldNumber1 = 1;  // The field you wish to read
+const int FieldNumber2 = 2;
+//-------------------------------//
 
 // Icon
 byte degreeIcon[] = {
@@ -124,12 +129,40 @@ void setup() {
   state = 1;
   buttonTimer = .5;
   isAlarming = false;
-  isAlarmActivated = true;
   isPressedButton = false;
   alarmState = 1;
   
   int_humidity = 0;
   int_temperature = 0;
+
+  //---------------- Channel 1 ----------------//
+  hourAlarming = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber1, myCounterReadAPIKey1);
+  minuteAlarming = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber2, myCounterReadAPIKey1);
+  int statusCode = ThingSpeak.getLastReadStatus();
+  if (statusCode == 200)
+  {
+    Serial.println("Successfully get data");
+  }
+  else
+  {
+    Serial.println("Unable to read channel / No internet connection");
+  }
+  delay(100);
+  //-------------- End of Channel 1 -------------//
+
+  //---------------- Channel 2 ----------------//
+  isAlarmActivated = ThingSpeak.readLongField(counterChannelNumber2, FieldNumber1, myCounterReadAPIKey2);
+  statusCode = ThingSpeak.getLastReadStatus();
+  if (statusCode == 200)
+  {
+    Serial.println("Successfully get data");
+  }
+  else
+  {
+    Serial.println("Unable to read channel / No internet connection");
+  }
+  delay(100);
+  //-------------- End of Channel 2 -------------//
   
   timeClient.begin();
   timeClient.setTimeOffset(25200);
@@ -173,21 +206,6 @@ void loop() {
    String h = String(int_humidity);
    String t = String(int_temperature);
 
-   String ThingSpeakData = t + "*C" + " / " + h + "%" + " / " + hourAlarmString + ":" + minuteAlarmString;
-
-   if (millis() - send_time >= send_time_repeat) {
-     Serial.println(ThingSpeakData);
-     ThingSpeak.setField(1, ThingSpeakData);
-     int x = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
-     if(x == 200){
-       Serial.println("Channel update successful.");
-     }
-     else{
-       Serial.println("Problem updating channel. HTTP error code " + String(x));
-     }
-     send_time = millis();
-   }
-
    unsigned long now = millis();
    if (now - lastMsg > 1000) {
      lastMsg = now;
@@ -199,6 +217,8 @@ void loop() {
      client.publish("alarm/currentHour", msg);
      snprintf (msg, MSG_BUFFER_SIZE, "%ld", minuteAlarming);
      client.publish("alarm/currentMinute", msg);
+     snprintf (msg, MSG_BUFFER_SIZE, "%ld", isAlarmActivated);
+     client.publish("alarm/currentActivation", msg);
    }
    
    //int alarmButton = digitalRead(BUTTON_ALARM);
@@ -292,12 +312,15 @@ void loop() {
           
         case 2:
           // Show Alarm Time
-          lcd.setCursor(3, 0);
-          lcd.print("Alarm Time");
-          lcd.setCursor(6, 1);
-          lcd.print(hourAlarmString);
-          lcd.print(":");
-          lcd.print(minuteAlarmString);
+          lcd.setCursor(3, 0); lcd.print("Alarm Time");
+          lcd.setCursor(4, 1); lcd.print(hourAlarmString);
+          lcd.print(":"); lcd.print(minuteAlarmString);
+          lcd.setCursor(10, 1);
+          if (isAlarmActivated) {
+            lcd.print("ON");
+          } else {
+            lcd.print("OFF");
+          }
           break;
       }
    }  
@@ -322,8 +345,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
     messageTemp += (char)payload[i];
   }
   Serial.println();
-
-  Serial.println(messageTemp);
 
   if (strcmp(topic, "alarm/hour") == 0) {
     int tempHourAlarm = messageTemp.toInt();
