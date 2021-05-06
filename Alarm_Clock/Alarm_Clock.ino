@@ -18,7 +18,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 int STATE_BUTTON = D5;
 int DHT_PIN = D6;
 //int BUZZER_PIN = 10;
-//int BUTTON_ALARM = 9;
+int BUTTON_ALARM = 9;
 
 String curHour, curMinute, currentDay, curMonth, curYear;
 String hourAlarmString, minuteAlarmString;
@@ -117,8 +117,8 @@ void setup() {
   // Setup pin for required input and output
   dht.begin();
   pinMode(STATE_BUTTON, INPUT);
-  //pinMode(BUZZER_PIN, OUTPUT);
-  //pinMode(BUTTON_ALARM, OUTPUT);
+  pinMode(BUTTON_ALARM, INPUT);
+  //pinMode(BUZZER_PIN, OUTPUT); 
   //noTone(BUZZER_PIN);
   setup_wifi();
 
@@ -221,7 +221,7 @@ void loop() {
      client.publish("alarm/currentActivation", msg);
    }
    
-   //int alarmButton = digitalRead(BUTTON_ALARM);
+   int alarmButton = digitalRead(BUTTON_ALARM);
   
    unsigned long epochTime = timeClient.getEpochTime();
   
@@ -261,19 +261,24 @@ void loop() {
    int currentYear = ptm->tm_year+1900;
    curYear = String(currentYear);
 
-   //if (alarmButton == HIGH && isAlarming) {
-   //   isAlarming = false;
-   //}
+   if (alarmButton == HIGH && isAlarming) {
+      isAlarming = false;
+   }
 
-   //if (hourAlarming == currentHour && minuteAlarming == currentMinute) {
-   //   if (isAlarmActivated && isAlarming) {
+   if (hourAlarming == currentHour && minuteAlarming == currentMinute) {
+      if (isAlarmActivated) {
    //       tone(BUZZER_PIN, 350, 5);
-   //   } else if (!isAlarmActivated || !isAlarming ) {
+            Serial.println("BUZZER");
+            isAlarming = true;
+      }
+      else if (!isAlarmActivated || !isAlarming ) {
    //       noTone(BUZZER_PIN);
-   //   }
-   //} else {
-   //   isAlarming = true;
-   //}
+            Serial.println("NO BUZZER");
+      }
+   } else {
+      Serial.println("NO BUZZER");
+      isAlarming = true;
+   }
 
    if (buttonState == HIGH && !isPressedButton) {
       isPressedButton = true;
