@@ -17,7 +17,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 int STATE_BUTTON = D5;
 int DHT_PIN = D6;
-//int BUZZER_PIN = 10;
+int BUZZER_PIN = D4;
 int BUTTON_ALARM = D7;
 
 String curHour, curMinute, currentDay, curMonth, curYear;
@@ -116,8 +116,8 @@ void setup() {
   dht.begin();
   pinMode(STATE_BUTTON, INPUT);
   pinMode(BUTTON_ALARM, INPUT);
-  //pinMode(BUZZER_PIN, OUTPUT); 
-  //noTone(BUZZER_PIN);
+  pinMode(BUZZER_PIN, OUTPUT); 
+  noTone(BUZZER_PIN);
   setup_wifi();
 
   client.setServer(mqtt_server, 1883);
@@ -132,6 +132,9 @@ void setup() {
   
   int_humidity = 0;
   int_temperature = 0;
+  //hourAlarming = 7;
+  //minuteAlarming = 0;
+  //isAlarmActivated = true;
 
   //---------------- Channel 1 ----------------//
   hourAlarming = ThingSpeak.readLongField(counterChannelNumber1, FieldNumber3, myCounterReadAPIKey1);
@@ -146,7 +149,7 @@ void setup() {
   {
     Serial.println("Unable to read channel / No internet connection");
   }
-  delay(100);
+  //delay(100);
   //-------------- End of Channel 1 -------------//
   
   timeClient.begin();
@@ -165,7 +168,6 @@ void loop() {
    current = millis();
    deltaTime = (current - oldTime) / 1000;
    // put your main code here, to run repeatedly:
-   delay(1000);
 
    if (hourAlarming < 10) {
       hourAlarmString = "0" + String(hourAlarming);
@@ -257,11 +259,9 @@ void loop() {
           isAlarmActivated = false;
       } else {
         if (!isAlarmActivated) {
-        //    noTone(BUZZER_PIN);
-              Serial.println("NO BUZZER");
+            noTone(BUZZER_PIN);
         } else if (isAlarmActivated) {
-        //    tone(BUZZER_PIN, 350, 5);
-              Serial.println("BUZZER");
+            tone(BUZZER_PIN, 10000);
         } 
       }
    } else {
@@ -304,12 +304,19 @@ void loop() {
           break;
           
         case 2:
-          // Show Alarm Time
-          lcd.setCursor(3, 0); lcd.print("Alarm Time");
-          lcd.setCursor(4, 1); lcd.print(hourAlarmString);
-          lcd.print(":"); lcd.print(minuteAlarmString);
-          lcd.setCursor(10, 1); lcd.print(alarmActivationString);
-          break;
+         // Show Alarm Time
+         lcd.setCursor(3, 0); lcd.print("Alarm Time");
+         lcd.setCursor(4, 1); lcd.print(hourAlarmString);
+         lcd.print(":"); lcd.print(minuteAlarmString);
+         lcd.setCursor(10, 1); lcd.print(alarmActivationString);
+         break;
+         if (isAlarmActivated) {
+            lcd.setCursor(12,1);
+            lcd.print("");
+            alarmActivationString = "ON";
+         } else {
+            alarmActivationString = "OFF";
+         }
       }
    }  
 
